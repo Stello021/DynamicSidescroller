@@ -10,6 +10,9 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
+#include "VectorTypes.h"
+#include "Components/SplineComponent.h"
+#include "Gameplay/Utilities/Actors/PlayerPath.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
@@ -32,23 +35,27 @@ ADynamicSidescrollerCharacter::ADynamicSidescrollerCharacter()
 
 	// Note: For faster iteration times these variables, and many more, can be tweaked in the Character Blueprint
 	// instead of recompiling to adjust them
-	GetCharacterMovement()->JumpZVelocity = 700.f;
-	GetCharacterMovement()->AirControl = 0.35f;
+	GetCharacterMovement()->JumpZVelocity = 1200.f;
+	GetCharacterMovement()->AirControl = 1.0f;
 	GetCharacterMovement()->MaxWalkSpeed = 500.f;
 	GetCharacterMovement()->MinAnalogWalkSpeed = 20.f;
 	GetCharacterMovement()->BrakingDecelerationWalking = 2000.f;
-	GetCharacterMovement()->BrakingDecelerationFalling = 1500.0f;
+	GetCharacterMovement()->BrakingDecelerationFalling = 1500.f;
+	GetCharacterMovement()->FallingLateralFriction = 500.0f;
 
 	// Create a camera boom (pulls in towards the player if there is a collision)
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
-	CameraBoom->TargetArmLength = 400.0f; // The camera follows at this distance behind the character	
+	CameraBoom->TargetArmLength = 700.0f; // The camera follows at this distance behind the character	
 	CameraBoom->bUsePawnControlRotation = true; // Rotate the arm based on the controller
 
 	// Create a follow camera
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName); // Attach the camera to the end of the boom and let the boom adjust to match the controller orientation
 	FollowCamera->bUsePawnControlRotation = false; // Camera does not rotate relative to arm
+
+	// Init as null the player path
+	Path = nullptr;
 
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
@@ -92,26 +99,30 @@ void ADynamicSidescrollerCharacter::SetupPlayerInputComponent(UInputComponent* P
 	}
 }
 
+/** Player moves only in the right direction*/
 void ADynamicSidescrollerCharacter::Move(const FInputActionValue& Value)
 {
-	// input is a Vector2D
-	FVector2D MovementVector = Value.Get<FVector2D>();
+	// input is a float
+	const float MovementAxisValue = Value.Get<float>();
 
-	if (Controller != nullptr)
+	if (Controller != nullptr && Path != nullptr)
 	{
-		// find out which way is forward
-		const FRotator Rotation = Controller->GetControlRotation();
-		const FRotator YawRotation(0, Rotation.Yaw, 0);
+		//Finding the tangent of the spline's closest point to this Character
+		//TANGENT: a vector that touches a specific point of the spline and points to its direction
+		//This vector normalized represent the direction that player use to move right or left from each point of the path
+		const FVector ClosestSplineTangent = Path->SplineComponent->FindTangentClosestToWorldLocation(GetActorLocation(), ESplineCoordinateSpace::World);
+		FVector MovementDirection = ClosestSplineTangent.GetSafeNormal();
+		//direction is positive or negative, based on input value, and is followed for an amount based on scan distance
+		MovementDirection = MovementDirection * MovementAxisValue * ScanDistance;
 
-		// get forward vector
-		const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
-	
-		// get right vector 
-		const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
-
-		// add movement 
-		AddMovementInput(ForwardDirection, MovementVector.Y);
-		AddMovementInput(RightDirection, MovementVector.X);
+		//Finding the new spline's point to move towards
+		const FVector ClosestNextSplinePoint = Path->SplineComponent->FindLocationClosestToWorldLocation(GetActorLocation() + MovementDirection, ESplineCoordinateSpace::World);
+		const FVector DirectionToNextSplinePoint = ClosestNextSplinePoint - GetActorLocation();
+		// add movement
+		//Direction is normalized to avoid arbitrary magnitude, Input value is absolute because represent only the intensity
+		//positivity is checked previously
+		AddMovementInput(DirectionToNextSplinePoint.GetSafeNormal(), FMath::Abs(MovementAxisValue));
+		//TO DO: Fix slow down on z-axis
 	}
 }
 

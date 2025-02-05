@@ -13,6 +13,8 @@ class UInputMappingContext;
 class UInputAction;
 struct FInputActionValue;
 
+class APlayerPath;
+
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
 UCLASS(config=Game)
@@ -44,10 +46,18 @@ class ADynamicSidescrollerCharacter : public ACharacter
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* LookAction;
 
+
 public:
 	ADynamicSidescrollerCharacter();
 	
+	/** Path to follow */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Path)
+	APlayerPath* Path;
 
+	/** Distance to follow the current path direction */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Path)
+	float ScanDistance;
+	
 protected:
 
 	/** Called for movement input */
