@@ -23,7 +23,7 @@ ADynamicSidescrollerCharacter::ADynamicSidescrollerCharacter()
 {
 	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
-		
+
 	// Don't rotate when the controller rotates. Let that just affect the camera.
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationYaw = false;
@@ -51,11 +51,13 @@ ADynamicSidescrollerCharacter::ADynamicSidescrollerCharacter()
 
 	// Create a follow camera
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
-	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName); // Attach the camera to the end of the boom and let the boom adjust to match the controller orientation
+	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
+	// Attach the camera to the end of the boom and let the boom adjust to match the controller orientation
 	FollowCamera->bUsePawnControlRotation = false; // Camera does not rotate relative to arm
 
 	// Init as null the player path
 	Path = nullptr;
+	ScanDistance = 250.f;
 
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
@@ -71,7 +73,8 @@ void ADynamicSidescrollerCharacter::NotifyControllerChanged()
 	// Add Input Mapping Context
 	if (APlayerController* PlayerController = Cast<APlayerController>(Controller))
 	{
-		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PlayerController->GetLocalPlayer()))
+		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<
+			UEnhancedInputLocalPlayerSubsystem>(PlayerController->GetLocalPlayer()))
 		{
 			Subsystem->AddMappingContext(DefaultMappingContext, 0);
 		}
@@ -81,21 +84,26 @@ void ADynamicSidescrollerCharacter::NotifyControllerChanged()
 void ADynamicSidescrollerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	// Set up action bindings
-	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent)) {
-		
+	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent))
+	{
 		// Jumping
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
 
 		// Moving
-		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ADynamicSidescrollerCharacter::Move);
+		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this,
+		                                   &ADynamicSidescrollerCharacter::Move);
 
 		// Looking
-		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ADynamicSidescrollerCharacter::Look);
+		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this,
+		                                   &ADynamicSidescrollerCharacter::Look);
 	}
 	else
 	{
-		UE_LOG(LogTemplateCharacter, Error, TEXT("'%s' Failed to find an Enhanced Input component! This template is built to use the Enhanced Input system. If you intend to use the legacy system, then you will need to update this C++ file."), *GetNameSafe(this));
+		UE_LOG(LogTemplateCharacter, Error,
+		       TEXT(
+			       "'%s' Failed to find an Enhanced Input component! This template is built to use the Enhanced Input system. If you intend to use the legacy system, then you will need to update this C++ file."
+		       ), *GetNameSafe(this));
 	}
 }
 
@@ -107,22 +115,36 @@ void ADynamicSidescrollerCharacter::Move(const FInputActionValue& Value)
 
 	if (Controller != nullptr && Path != nullptr)
 	{
+		// Get the character's current distance along the spline
+		const float CurrentDistance = Path->SplineComponent->GetDistanceAlongSplineAtLocation(GetActorLocation(), ESplineCoordinateSpace::World);
+		const float SplineLength = Path->SplineComponent->GetSplineLength();
+
+		// Restrict movement at spline boundaries
+		if ((CurrentDistance <= 0.0f && MovementAxisValue < 0) || (CurrentDistance >= SplineLength && MovementAxisValue > 0))
+		{
+			// Prevent movement if trying to go out of bounds
+			return;
+		}
+		
 		//Finding the tangent of the spline's closest point to this Character
 		//TANGENT: a vector that touches a specific point of the spline and points to its direction
 		//This vector normalized represent the direction that player use to move right or left from each point of the path
+		//All vectors ignored Z-axis to not be affected by the height distance from player and spline (Z-axis is only for jumping)
 		const FVector ClosestSplineTangent = Path->SplineComponent->FindTangentClosestToWorldLocation(GetActorLocation(), ESplineCoordinateSpace::World);
-		FVector MovementDirection = ClosestSplineTangent.GetSafeNormal();
+		FVector MovementDirection = ClosestSplineTangent.GetSafeNormal2D();
 		//direction is positive or negative, based on input value, and is followed for an amount based on scan distance
 		MovementDirection = MovementDirection * MovementAxisValue * ScanDistance;
 
 		//Finding the new spline's point to move towards
-		const FVector ClosestNextSplinePoint = Path->SplineComponent->FindLocationClosestToWorldLocation(GetActorLocation() + MovementDirection, ESplineCoordinateSpace::World);
-		const FVector DirectionToNextSplinePoint = ClosestNextSplinePoint - GetActorLocation();
+		const FVector ClosestNextSplinePoint = Path->SplineComponent->FindLocationClosestToWorldLocation(
+		     MovementDirection + GetActorLocation(), ESplineCoordinateSpace::World);
+		FVector DirectionToNextSplinePoint = ClosestNextSplinePoint - GetActorLocation();
+		FVector NormalizedDirectionToNextSplinePoint = DirectionToNextSplinePoint.GetSafeNormal2D();
+			
 		// add movement
 		//Direction is normalized to avoid arbitrary magnitude, Input value is absolute because represent only the intensity
 		//positivity is checked previously
-		AddMovementInput(DirectionToNextSplinePoint.GetSafeNormal(), FMath::Abs(MovementAxisValue));
-		//TO DO: Fix slow down on z-axis
+		AddMovementInput(NormalizedDirectionToNextSplinePoint, FMath::Abs(MovementAxisValue));
 	}
 }
 
