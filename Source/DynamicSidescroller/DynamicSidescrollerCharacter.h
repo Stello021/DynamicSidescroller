@@ -66,9 +66,6 @@ protected:
 	/** Called for looking input */
 	void Look(const FInputActionValue& Value);
 
-private:
-	FVector FirstPathPoint;
-	FVector LastPathPoint;
 
 protected:
 
