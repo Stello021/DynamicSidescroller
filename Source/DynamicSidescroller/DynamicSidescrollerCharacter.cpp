@@ -71,7 +71,7 @@ void ADynamicSidescrollerCharacter::NotifyControllerChanged()
 	Super::NotifyControllerChanged();
 
 	// Add Input Mapping Context
-	if (APlayerController* PlayerController = Cast<APlayerController>(Controller))
+	if (const APlayerController* PlayerController = Cast<APlayerController>(Controller))
 	{
 		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<
 			UEnhancedInputLocalPlayerSubsystem>(PlayerController->GetLocalPlayer()))
@@ -119,29 +119,17 @@ void ADynamicSidescrollerCharacter::Move(const FInputActionValue& Value)
 		{
 			// Get the character's current distance along the spline
 			const float CurrentDistance = Path->SplineComponent->GetDistanceAlongSplineAtLocation(GetActorLocation(), ESplineCoordinateSpace::World);
-			const float SplineLength = Path->SplineComponent->GetSplineLength();
 
 			// Restrict movement at spline boundaries
-			if ((CurrentDistance <= 0.0f && MovementAxisValue < 0) || (CurrentDistance >= SplineLength && MovementAxisValue > 0))
+			if (const float SplineLength = Path->SplineComponent->GetSplineLength();
+				(CurrentDistance <= 0.0f && MovementAxisValue < 0) || (CurrentDistance >= SplineLength && MovementAxisValue > 0))
 			{
 				// Prevent movement if trying to go out of bounds
 				return;
 			}
 		}
-		
-		//Finding the tangent of the spline's closest point to this Character
-		//TANGENT: a vector that touches a specific point of the spline and points to its direction
-		//This vector normalized represent the orientation that player use to move right or left from each point of the path
-		const FVector ClosestSplineTangent = Path->SplineComponent->FindTangentClosestToWorldLocation(GetActorLocation(), ESplineCoordinateSpace::World);
-		//All vectors ignored Z-axis to not be affected by the height distance from player and spline (Z-axis is only for jumping)
-		FVector MovementOrientation = ClosestSplineTangent.GetSafeNormal2D();
-		//orientation is positive or negative, based on input value, and is followed for an amount based on scan distance
-		MovementOrientation = MovementOrientation * MovementAxisValue * ScanDistance;
 
-		//Finding the new spline's point to move towards
-		const FVector ClosestNextSplinePoint = Path->SplineComponent->FindLocationClosestToWorldLocation(
-		     MovementOrientation + GetActorLocation(), ESplineCoordinateSpace::World);
-		FVector MovementDirection = ClosestNextSplinePoint - GetActorLocation();
+		const FVector MovementDirection = CalculateMovementDirection(*Path->SplineComponent, MovementAxisValue);
 			
 		// add movement
 		//Direction is normalized to avoid arbitrary magnitude, Input value is absolute because represent only the intensity
@@ -153,7 +141,7 @@ void ADynamicSidescrollerCharacter::Move(const FInputActionValue& Value)
 void ADynamicSidescrollerCharacter::Look(const FInputActionValue& Value)
 {
 	// input is a Vector2D
-	FVector2D LookAxisVector = Value.Get<FVector2D>();
+	const FVector2D LookAxisVector = Value.Get<FVector2D>();
 
 	if (Controller != nullptr)
 	{
@@ -162,3 +150,23 @@ void ADynamicSidescrollerCharacter::Look(const FInputActionValue& Value)
 		AddControllerPitchInput(LookAxisVector.Y);
 	}
 }
+
+FVector ADynamicSidescrollerCharacter::CalculateMovementDirection(const USplineComponent& SplineComponent,
+	const float MovementAxisValue) const
+{
+	//Finding the tangent of the spline's closest point to this Character
+	//TANGENT: a vector that touches a specific point of the spline and points to its direction
+	//This vector normalized represent the orientation that player use to move right or left from each point of the path
+	const FVector ClosestSplineTangent = Path->SplineComponent->FindTangentClosestToWorldLocation(GetActorLocation(), ESplineCoordinateSpace::World);
+	//All vectors ignored Z-axis to not be affected by the height distance from player and spline (Z-axis is only for jumping)
+	FVector MovementOrientation = ClosestSplineTangent.GetSafeNormal2D();
+	//orientation is positive or negative, based on input value, and is followed for an amount based on scan distance
+	MovementOrientation = MovementOrientation * MovementAxisValue * ScanDistance;
+
+	//Finding the new spline's point to move towards
+	const FVector ClosestNextSplinePoint = Path->SplineComponent->FindLocationClosestToWorldLocation(
+		 MovementOrientation + GetActorLocation(), ESplineCoordinateSpace::World);
+	const FVector MovementDirection = ClosestNextSplinePoint - GetActorLocation();
+	return MovementDirection;
+}
+

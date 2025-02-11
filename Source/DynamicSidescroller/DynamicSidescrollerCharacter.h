@@ -7,6 +7,7 @@
 #include "Logging/LogMacros.h"
 #include "DynamicSidescrollerCharacter.generated.h"
 
+class USplineComponent;
 class USpringArmComponent;
 class UCameraComponent;
 class UInputMappingContext;
@@ -65,6 +66,8 @@ protected:
 
 	/** Called for looking input */
 	void Look(const FInputActionValue& Value);
+
+	FVector CalculateMovementDirection(const USplineComponent& SplineComponent, const float MovementAxisValue) const;
 
 
 protected:
