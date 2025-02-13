@@ -20,3 +20,16 @@ When spline is **not a closed loop** there could be **floating precision issues*
 To fix it, before movement is calculated, actor location is checked to allows movement only in the opposite direction.
 
 ![Movement Example.gif](Documentation/Media/Movement%20Example.gif)
+
+### Custom Movement Component
+Player use a custom movement component that manage many features:
+
+#### Slope
+Character slow down or speed up based on floor slope.
+It's used a `UCurveFloat` that determines the `MaxWalkSpeed` value
+at a specific **slope**. This value is interpolated with current speed value.
+
+**Slope** is calculated as the **Dot product** between 
+the current floor impact normal and the player forward. 
+
+![SlopeSpeed.gif](Documentation/Media/SlopeSpeed.gif)
