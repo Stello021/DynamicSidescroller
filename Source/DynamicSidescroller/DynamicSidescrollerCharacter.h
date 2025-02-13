@@ -49,7 +49,7 @@ class ADynamicSidescrollerCharacter : public ACharacter
 
 
 public:
-	ADynamicSidescrollerCharacter();
+	ADynamicSidescrollerCharacter(const FObjectInitializer& ObjectInitializer);
 	
 	/** Path to follow */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Path)

@@ -13,13 +13,15 @@
 #include "VectorTypes.h"
 #include "Components/SplineComponent.h"
 #include "Gameplay/Utilities/Actors/PlayerPath.h"
+#include "DSc_CharacterMovementComponent.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
 //////////////////////////////////////////////////////////////////////////
 // ADynamicSidescrollerCharacter
 
-ADynamicSidescrollerCharacter::ADynamicSidescrollerCharacter()
+ADynamicSidescrollerCharacter::ADynamicSidescrollerCharacter(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer.SetDefaultSubobjectClass<UDSc_CharacterMovementComponent>(TEXT("DScCharMoveComp")))
 {
 	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
