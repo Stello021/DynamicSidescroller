@@ -33,3 +33,15 @@ at a specific **slope**. This value is interpolated with current speed value.
 the current floor impact normal and the player forward. 
 
 ![SlopeSpeed.gif](Documentation/Media/SlopeSpeed.gif)
+
+#### Different Surface Types
+Player has different movement settings when walk on different surfaces.
+Floor static mesh own a *Physical Material* with **custom Surface Type**.
+Character movement has a `TMap<TEnumAsByte<EPhysicalSurface>, FSurfaceSettings>` 
+that allows to edit in Blueprint specific Movement Settings for every **Surface Type**.
+During `PhysWalking` simulation are set relative settings at every Surface Type changes.
+
+For optimization `TMap` is not used at runtime, but data copy are stored in a `TArray`, using key to index.
+This `TArray` is built on **Component ctor**, when `TMap` property is edited on Blueprint (`PostEditChangeProperty`)
+and in BeginPlay if it's already set. 
+
