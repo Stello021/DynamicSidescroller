@@ -41,18 +41,18 @@ public:
 
 protected:
 
+#if WITH_EDITORONLY_DATA
 	//Collect all different surfaces and relative settings to apply
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Character Movement: Walking (Surface Settings)")
 	TMap<TEnumAsByte<EPhysicalSurface>, FSurfaceSettings> SurfaceMap;
-
+#endif
+	
 	TEnumAsByte<EPhysicalSurface> OldFloorSurface;
 
 	/**copy of Surface Settings Tmap for optimized runtime usage*/
 	TArray<FSurfaceSettings> SurfaceSettings;
 	
 	virtual void PhysWalking(float deltaTime, int32 Iterations) override;
-
-	virtual  void BeginPlay() override;
 
 #if WITH_EDITOR
 	virtual void PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent) override;

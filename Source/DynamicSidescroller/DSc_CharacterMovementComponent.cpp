@@ -2,6 +2,8 @@
 
 
 #include "DSc_CharacterMovementComponent.h"
+
+#include "InterchangeResult.h"
 #include "GameFramework/Character.h"
 
 UDSc_CharacterMovementComponent::UDSc_CharacterMovementComponent()
@@ -17,13 +19,22 @@ UDSc_CharacterMovementComponent::UDSc_CharacterMovementComponent()
 
 	FSurfaceSettings DefaultSurfaceSettings;
 	DefaultSurfaceSettings.GroundFriction = 8.f;
-	DefaultSurfaceSettings.BrakingDecelerationOnWalking = 20000.f;
+	DefaultSurfaceSettings.BrakingDecelerationOnWalking = 2000.f;
 
 	for (int32 i = 0; i < SurfaceType_Max; i++)
 	{
 		TEnumAsByte<EPhysicalSurface> SurfaceType(i);
 
-		SurfaceMap.Add(SurfaceType, DefaultSurfaceSettings);
+		FText SurfaceTypeDisplayText;
+
+		UEnum::GetDisplayValueAsText(SurfaceType, SurfaceTypeDisplayText);
+
+		FString ExpectedText = FString::Printf(TEXT("Surface Type %d"), i);
+
+		if (SurfaceTypeDisplayText.ToString() != ExpectedText)
+		{
+			SurfaceMap.Add(SurfaceType, DefaultSurfaceSettings);
+		}
 	}
 }
 
@@ -41,16 +52,6 @@ void UDSc_CharacterMovementComponent::PhysWalking(float deltaTime, int32 Iterati
 		const FSurfaceSettings& CurrentSettings = SurfaceSettings[OldFloorSurface];
 		BrakingDecelerationWalking = CurrentSettings.BrakingDecelerationOnWalking;
 		GroundFriction = CurrentSettings.GroundFriction;
-	}
-}
-
-void UDSc_CharacterMovementComponent::BeginPlay()
-{
-	Super::BeginPlay();
-
-	if (SurfaceSettings.IsEmpty())
-	{
-		BuildRuntimeSurfaceSettings();
 	}
 }
 
