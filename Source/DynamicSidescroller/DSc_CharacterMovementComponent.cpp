@@ -17,7 +17,7 @@ UDSc_CharacterMovementComponent::UDSc_CharacterMovementComponent()
 
 	FSurfaceSettings DefaultSurfaceSettings;
 	DefaultSurfaceSettings.GroundFriction = 8.f;
-	DefaultSurfaceSettings.BrakingDecelerationOnWalking = 20000.f;
+	DefaultSurfaceSettings.BrakingDecelerationOnWalking = 2000.f;
 
 	for (int32 i = 0; i < SurfaceType_Max; i++)
 	{
@@ -44,27 +44,12 @@ void UDSc_CharacterMovementComponent::PhysWalking(float deltaTime, int32 Iterati
 	}
 }
 
-void UDSc_CharacterMovementComponent::BeginPlay()
+void UDSc_CharacterMovementComponent::InitializeComponent()
 {
-	Super::BeginPlay();
+	Super::InitializeComponent();
 
-	if (SurfaceSettings.IsEmpty())
-	{
-		BuildRuntimeSurfaceSettings();
-	}
-}
-
-/** Event called when edit a Property in editor*/
-void UDSc_CharacterMovementComponent::PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent)
-{
-	Super::PostEditChangeProperty(PropertyChangedEvent);
-
-	// Check for surface settings TMap property
-	if (PropertyChangedEvent.GetPropertyName() == GET_MEMBER_NAME_CHECKED(UDSc_CharacterMovementComponent, SurfaceMap))
-	{
-		//Rebuild TArray
-		BuildRuntimeSurfaceSettings();
-	}
+	BuildRuntimeSurfaceSettings();
+	SurfaceMap.Empty();
 }
 
 void UDSc_CharacterMovementComponent::BuildRuntimeSurfaceSettings()

@@ -52,11 +52,8 @@ protected:
 	
 	virtual void PhysWalking(float deltaTime, int32 Iterations) override;
 
-	virtual  void BeginPlay() override;
+	virtual  void InitializeComponent() override;	
 
-#if WITH_EDITOR
-	virtual void PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent) override;
-#endif
 
 private:
 
