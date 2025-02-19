@@ -21,7 +21,12 @@ struct FSurfaceSettings
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Movement)
 	float GroundFriction;
-	
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Movement)
+	float MaxWalkingSpeed;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Movement)
+	bool bAffectedBySlope;
 };
 
 /**
@@ -49,6 +54,8 @@ protected:
 
 	/**copy of Surface Settings Tmap for optimized runtime usage*/
 	TArray<FSurfaceSettings> SurfaceSettings;
+
+	bool bAffectedBySlope;
 	
 	virtual void PhysWalking(float deltaTime, int32 Iterations) override;
 
@@ -56,6 +63,9 @@ protected:
 
 
 private:
+
+	//multiply or divide float value from Curve Float based on the ratio between Default and Current Max Walk Speed
+	float SlopeSpeedScale;
 
 	/** Build the TArray associated to Surface Settings TMap */
 	void BuildRuntimeSurfaceSettings();

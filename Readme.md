@@ -42,6 +42,5 @@ that allows to edit in Blueprint specific Movement Settings for every **Surface 
 During `PhysWalking` simulation are set relative settings at every Surface Type changes.
 
 For optimization `TMap` is not used at runtime, but data copy are stored in a `TArray`, using key to index.
-This `TArray` is built on **Component ctor**, when `TMap` property is edited on Blueprint (`PostEditChangeProperty`)
-and in BeginPlay if it's already set. 
+This `TArray` is built in `InitComponent` and **Map** is deallocated. 
 
