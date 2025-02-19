@@ -50,6 +50,8 @@ ADynamicSidescrollerCharacter::ADynamicSidescrollerCharacter(const FObjectInitia
 	CameraBoom->SetupAttachment(RootComponent);
 	CameraBoom->TargetArmLength = 700.0f; // The camera follows at this distance behind the character	
 	CameraBoom->bUsePawnControlRotation = true; // Rotate the arm based on the controller
+	CameraBoom->bInheritPitch = false;
+	CameraBoom->bInheritYaw = false;
 
 	// Create a follow camera
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
@@ -97,10 +99,6 @@ void ADynamicSidescrollerCharacter::SetupPlayerInputComponent(UInputComponent* P
 		// Moving
 		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this,
 		                                   &ADynamicSidescrollerCharacter::Move);
-
-		// Looking
-		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this,
-		                                   &ADynamicSidescrollerCharacter::Look);
 	}
 	else
 	{
@@ -139,19 +137,6 @@ void ADynamicSidescrollerCharacter::Move(const FInputActionValue& Value)
 		//Direction is normalized to avoid arbitrary magnitude, Input value is absolute because represent only the intensity
 		//positivity is checked previously
 		AddMovementInput(MovementDirection.GetSafeNormal2D(), FMath::Abs(MovementAxisValue));
-	}
-}
-
-void ADynamicSidescrollerCharacter::Look(const FInputActionValue& Value)
-{
-	// input is a Vector2D
-	const FVector2D LookAxisVector = Value.Get<FVector2D>();
-
-	if (Controller != nullptr)
-	{
-		// add yaw and pitch input to controller
-		AddControllerYawInput(LookAxisVector.X);
-		AddControllerPitchInput(LookAxisVector.Y);
 	}
 }
 
