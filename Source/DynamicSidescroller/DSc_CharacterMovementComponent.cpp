@@ -2,10 +2,12 @@
 
 
 #include "DSc_CharacterMovementComponent.h"
+
+#include "InterchangeResult.h"
 #include "GameFramework/Character.h"
 
 UDSc_CharacterMovementComponent::UDSc_CharacterMovementComponent()
-	: OldFloorSurface(SurfaceType_Default), bAffectedBySlope(true), SlopeSpeedScale(1.f)
+	: OldFloorSurface(SurfaceType_Default)
 {
 	// Initialize curve with default values
 	const ConstructorHelpers::FObjectFinder<UCurveFloat> DefaultSpeedCurve(
@@ -16,32 +18,30 @@ UDSc_CharacterMovementComponent::UDSc_CharacterMovementComponent()
 	}
 
 	FSurfaceSettings DefaultSurfaceSettings;
-	DefaultSurfaceSettings.GroundFriction = GroundFriction;
-	DefaultSurfaceSettings.BrakingDecelerationOnWalking = BrakingDecelerationWalking;
-	DefaultSurfaceSettings.MaxWalkingSpeed = MaxWalkSpeed;
-	DefaultSurfaceSettings.bAffectedBySlope = bAffectedBySlope;
+	DefaultSurfaceSettings.GroundFriction = 8.f;
+	DefaultSurfaceSettings.BrakingDecelerationOnWalking = 2000.f;
 
 	for (int32 i = 0; i < SurfaceType_Max; i++)
 	{
 		TEnumAsByte<EPhysicalSurface> SurfaceType(i);
 
-		FText SurfaceTypeDisplayName;
-		UEnum::GetDisplayValueAsText(SurfaceType, SurfaceTypeDisplayName);
+		FText SurfaceTypeDisplayText;
 
-		FString ExpectedName = FString::Printf(TEXT("Surface Type %d"), i);
+		UEnum::GetDisplayValueAsText(SurfaceType, SurfaceTypeDisplayText);
 
-		if (SurfaceTypeDisplayName.ToString() == ExpectedName)
+		FString ExpectedText = FString::Printf(TEXT("Surface Type %d"), i);
+
+		if (SurfaceTypeDisplayText.ToString() != ExpectedText)
 		{
-			break;
+			SurfaceMap.Add(SurfaceType, DefaultSurfaceSettings);
 		}
-
-		SurfaceMap.Add(SurfaceType, DefaultSurfaceSettings);
 	}
 }
 
 void UDSc_CharacterMovementComponent::PhysWalking(float deltaTime, int32 Iterations)
 {
 	Super::PhysWalking(deltaTime, Iterations);
+	CalculateSpeedOnSlope(deltaTime);
 
 	/** Check if current floor surface type is changed*/
 	if (!SurfaceSettings.IsEmpty() && OldFloorSurface != CurrentFloor.HitResult.PhysMaterial->SurfaceType)
@@ -52,23 +52,20 @@ void UDSc_CharacterMovementComponent::PhysWalking(float deltaTime, int32 Iterati
 		const FSurfaceSettings& CurrentSettings = SurfaceSettings[OldFloorSurface];
 		BrakingDecelerationWalking = CurrentSettings.BrakingDecelerationOnWalking;
 		GroundFriction = CurrentSettings.GroundFriction;
-		MaxWalkSpeed = CurrentSettings.MaxWalkingSpeed;
-		bAffectedBySlope = CurrentSettings.bAffectedBySlope;
-		SlopeSpeedScale = SurfaceSettings[SurfaceType_Default].MaxWalkingSpeed / MaxWalkSpeed;
-	}
-
-	if (bAffectedBySlope)
-	{
-		CalculateSpeedOnSlope(deltaTime);
 	}
 }
 
-void UDSc_CharacterMovementComponent::InitializeComponent()
+/** Event called when edit a Property in editor*/
+void UDSc_CharacterMovementComponent::PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent)
 {
-	Super::InitializeComponent();
+	Super::PostEditChangeProperty(PropertyChangedEvent);
 
-	BuildRuntimeSurfaceSettings();
-	SurfaceMap.Empty();
+	// Check for surface settings TMap property
+	if (PropertyChangedEvent.GetPropertyName() == GET_MEMBER_NAME_CHECKED(UDSc_CharacterMovementComponent, SurfaceMap))
+	{
+		//Rebuild TArray
+		BuildRuntimeSurfaceSettings();
+	}
 }
 
 void UDSc_CharacterMovementComponent::BuildRuntimeSurfaceSettings()
@@ -94,15 +91,6 @@ void UDSc_CharacterMovementComponent::CalculateSpeedOnSlope(const float deltaTim
 	}
 	const float SlopeAlignement = FVector::DotProduct(CurrentFloor.HitResult.ImpactNormal,
 	                                                  GetCharacterOwner()->GetActorForwardVector());
-	float FixedSpeed = OnSlopeSpeedCurve->GetFloatValue(SlopeAlignement);
-
-	if (SlopeSpeedScale > 1.f)
-	{
-		FixedSpeed /= SlopeSpeedScale;
-	}
-	else if (SlopeSpeedScale < 1.f)
-	{
-		FixedSpeed *= SlopeSpeedScale;
-	}
+	const float FixedSpeed = OnSlopeSpeedCurve->GetFloatValue(SlopeAlignement);
 	MaxWalkSpeed = FMath::FInterpTo(MaxWalkSpeed, FixedSpeed, deltaTime, 20.f);
 }
