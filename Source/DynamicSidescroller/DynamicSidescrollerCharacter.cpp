@@ -31,6 +31,8 @@ ADynamicSidescrollerCharacter::ADynamicSidescrollerCharacter(const FObjectInitia
 	bUseControllerRotationYaw = false;
 	bUseControllerRotationRoll = false;
 
+	
+
 	// Configure character movement
 	GetCharacterMovement()->bOrientRotationToMovement = true; // Character moves in the direction of input...	
 	GetCharacterMovement()->RotationRate = FRotator(0.0f, 500.0f, 0.0f); // ...at this rotation rate
@@ -45,13 +47,19 @@ ADynamicSidescrollerCharacter::ADynamicSidescrollerCharacter(const FObjectInitia
 	GetCharacterMovement()->BrakingDecelerationFalling = 1500.f;
 	GetCharacterMovement()->FallingLateralFriction = 500.0f;
 
+	CameraPivot = CreateDefaultSubobject<USceneComponent>(TEXT("CameraPivot"));
+	CameraPivot->SetupAttachment(GetRootComponent());
+	CameraPivot->SetAbsolute(false, true, false);
+	
+
 	// Create a camera boom (pulls in towards the player if there is a collision)
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
-	CameraBoom->SetupAttachment(RootComponent);
+	CameraBoom->SetupAttachment(CameraPivot);
 	CameraBoom->TargetArmLength = 700.0f; // The camera follows at this distance behind the character	
-	CameraBoom->bUsePawnControlRotation = true; // Rotate the arm based on the controller
+	CameraBoom->bUsePawnControlRotation = false; // Rotate the arm based on the controller
 	CameraBoom->bInheritPitch = false;
 	CameraBoom->bInheritYaw = false;
+	CameraBoom->bInheritRoll = false;
 
 	// Create a follow camera
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
@@ -137,6 +145,26 @@ void ADynamicSidescrollerCharacter::Move(const FInputActionValue& Value)
 		//Direction is normalized to avoid arbitrary magnitude, Input value is absolute because represent only the intensity
 		//positivity is checked previously
 		AddMovementInput(MovementDirection.GetSafeNormal2D(), FMath::Abs(MovementAxisValue));
+
+		
+		FRotator TargetRotator = GetActorRotation();
+		
+		if (MovementAxisValue < 0.f)
+		{
+			TargetRotator.Yaw += 180.f;
+		}
+
+		FQuat CurrentQuat = CameraPivot->GetComponentQuat();
+		FQuat TargetQuat = TargetRotator.Quaternion();
+
+		FQuat SmoothedQuat = FQuat::Slerp(CurrentQuat, TargetQuat, GetWorld()->GetDeltaSeconds() * 2.f);
+		CameraPivot->SetWorldRotation(SmoothedQuat);
+		
+		CameraBoom->SetRelativeRotation(SmoothedQuat
+			* FQuat(FRotator(CameraBoom->GetRelativeRotation().Pitch, -90.f, CameraBoom->GetRelativeRotation().Roll)));
+
+
+		 
 	}
 }
 
