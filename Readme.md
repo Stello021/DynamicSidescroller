@@ -44,3 +44,20 @@ During `PhysWalking` simulation are set relative settings at every Surface Type 
 For optimization `TMap` is not used at runtime, but data copy are stored in a `TArray`, using key to index.
 This `TArray` is built in `InitComponent` and **Map** is deallocated. 
 
+## Sidescroller camera 
+Activating the `bkeepSidescrollerView` in _Character Blueprint settings_
+or managing it at **runtime**, Camera will have a fixed Sidescroller view.
+
+### How it works
+`CameraBoom` is attached to a `CameraPivot` (`USceneComponent`).
+It has same Character rotation when moves **forward** 
+and flips 180° when moves **backward**, 
+using **Absolute Rotation** for a manual management.
+
+First pass, getting **Target Rotation** as `FQuat`,
+to avoid jittering and worthless rotation issues.
+
+After that, using **Slerp** for a smooth rotation
+and update Pivot and Spring Arm rotation, applying its offset.
+
+![Camera.gif](Documentation/Media/Camera.gif)

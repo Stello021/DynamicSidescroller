@@ -59,6 +59,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Path)
 	float ScanDistance;
 	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Camera)
+	float CameraInterpolationSpeed;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Camera)
+	bool bKeepSidescrollerView;
+
 protected:
 
 	/** Called for movement input */
@@ -66,12 +72,15 @@ protected:
 
 	FVector CalculateMovementDirection(const USplineComponent& SplineComponent, const float MovementAxisValue) const;
 
-
-protected:
-
 	virtual void NotifyControllerChanged() override;
 
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+	
+    /** Determine the target rotation, based on movement direction*/
+	FQuat GetTargetPivotQuat(float MovementAxisValue) const;
+
+	/** Called for keeping sidescroller view during movement and direction changes */
+	void KeepSidescrollerView(float MovementAxisValue) const;
 
 public:
 	/** Returns CameraBoom subobject **/

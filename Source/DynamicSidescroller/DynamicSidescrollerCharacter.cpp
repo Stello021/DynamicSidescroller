@@ -21,7 +21,8 @@ DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 // ADynamicSidescrollerCharacter
 
 ADynamicSidescrollerCharacter::ADynamicSidescrollerCharacter(const FObjectInitializer& ObjectInitializer)
-	: Super(ObjectInitializer.SetDefaultSubobjectClass<UDSc_CharacterMovementComponent>(TEXT("DScCharMoveComp")))
+	: Super(ObjectInitializer.SetDefaultSubobjectClass<UDSc_CharacterMovementComponent>(TEXT("DScCharMoveComp"))),
+	  CameraInterpolationSpeed(2.f), bKeepSidescrollerView(true)
 {
 	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
@@ -31,7 +32,6 @@ ADynamicSidescrollerCharacter::ADynamicSidescrollerCharacter(const FObjectInitia
 	bUseControllerRotationYaw = false;
 	bUseControllerRotationRoll = false;
 
-	
 
 	// Configure character movement
 	GetCharacterMovement()->bOrientRotationToMovement = true; // Character moves in the direction of input...	
@@ -50,7 +50,7 @@ ADynamicSidescrollerCharacter::ADynamicSidescrollerCharacter(const FObjectInitia
 	CameraPivot = CreateDefaultSubobject<USceneComponent>(TEXT("CameraPivot"));
 	CameraPivot->SetupAttachment(GetRootComponent());
 	CameraPivot->SetAbsolute(false, true, false);
-	
+
 
 	// Create a camera boom (pulls in towards the player if there is a collision)
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
@@ -117,6 +117,40 @@ void ADynamicSidescrollerCharacter::SetupPlayerInputComponent(UInputComponent* P
 	}
 }
 
+FQuat ADynamicSidescrollerCharacter::GetTargetPivotQuat(const float MovementAxisValue) const
+{
+	//Get the character's rotation as a base
+	FRotator TargetRotator = GetActorRotation();
+
+	//if moving backward, flip 180°
+	if (MovementAxisValue < 0.f)
+	{
+		TargetRotator.Yaw += 180.f;
+	}
+
+	return TargetRotator.Quaternion();
+}
+
+void ADynamicSidescrollerCharacter::KeepSidescrollerView(const float MovementAxisValue) const
+{
+	const FQuat TargetQuat = GetTargetPivotQuat(MovementAxisValue);
+
+	const FQuat CurrentQuat = CameraPivot->GetComponentQuat();
+
+	// Smoothly interpolate using SLERP (Spherical Linear Interpolation)
+	const FQuat SmoothedQuat = FQuat::Slerp(CurrentQuat, TargetQuat,
+	                                        GetWorld()->GetDeltaSeconds() * CameraInterpolationSpeed);
+
+	//Update pivot rotation
+	CameraPivot->SetWorldRotation(SmoothedQuat);
+
+	FQuat SpringArmOffset(FRotator(CameraBoom->GetRelativeRotation().Pitch, -90.f,
+	                               CameraBoom->GetRelativeRotation().Roll));
+
+	//Update spring arm rotation
+	CameraBoom->SetRelativeRotation(SmoothedQuat * SpringArmOffset);
+}
+
 /** Player moves only in the right direction*/
 void ADynamicSidescrollerCharacter::Move(const FInputActionValue& Value)
 {
@@ -128,53 +162,40 @@ void ADynamicSidescrollerCharacter::Move(const FInputActionValue& Value)
 		if (!Path->SplineComponent->IsClosedLoop())
 		{
 			// Get the character's current distance along the spline
-			const float CurrentDistance = Path->SplineComponent->GetDistanceAlongSplineAtLocation(GetActorLocation(), ESplineCoordinateSpace::World);
+			const float CurrentDistance = Path->SplineComponent->GetDistanceAlongSplineAtLocation(
+				GetActorLocation(), ESplineCoordinateSpace::World);
 
 			// Restrict movement at spline boundaries
 			if (const float SplineLength = Path->SplineComponent->GetSplineLength();
-				(CurrentDistance <= 0.0f && MovementAxisValue < 0) || (CurrentDistance >= SplineLength && MovementAxisValue > 0))
+				(CurrentDistance <= 0.0f && MovementAxisValue < 0) || (CurrentDistance >= SplineLength &&
+					MovementAxisValue > 0))
 			{
 				// Prevent movement if trying to go out of bounds
 				return;
 			}
 		}
 
-		const FVector MovementDirection = CalculateMovementDirection(*Path->SplineComponent, MovementAxisValue);
-			
+		const FVector MovementDirection = CalculateMovementDirection(*Path->SplineComponent,  MovementAxisValue);
+
 		// add movement
 		//Direction is normalized to avoid arbitrary magnitude, Input value is absolute because represent only the intensity
 		//positivity is checked previously
 		AddMovementInput(MovementDirection.GetSafeNormal2D(), FMath::Abs(MovementAxisValue));
-
-		
-		FRotator TargetRotator = GetActorRotation();
-		
-		if (MovementAxisValue < 0.f)
+		if (bKeepSidescrollerView)
 		{
-			TargetRotator.Yaw += 180.f;
+			KeepSidescrollerView(FMath::Sign(MovementAxisValue));
 		}
-
-		FQuat CurrentQuat = CameraPivot->GetComponentQuat();
-		FQuat TargetQuat = TargetRotator.Quaternion();
-
-		FQuat SmoothedQuat = FQuat::Slerp(CurrentQuat, TargetQuat, GetWorld()->GetDeltaSeconds() * 2.f);
-		CameraPivot->SetWorldRotation(SmoothedQuat);
-		
-		CameraBoom->SetRelativeRotation(SmoothedQuat
-			* FQuat(FRotator(CameraBoom->GetRelativeRotation().Pitch, -90.f, CameraBoom->GetRelativeRotation().Roll)));
-
-
-		 
 	}
 }
 
 FVector ADynamicSidescrollerCharacter::CalculateMovementDirection(const USplineComponent& SplineComponent,
-	const float MovementAxisValue) const
+                                                                  const float MovementAxisValue) const
 {
 	//Finding the tangent of the spline's closest point to this Character
 	//TANGENT: a vector that touches a specific point of the spline and points to its direction
 	//This vector normalized represent the orientation that player use to move right or left from each point of the path
-	const FVector ClosestSplineTangent = Path->SplineComponent->FindTangentClosestToWorldLocation(GetActorLocation(), ESplineCoordinateSpace::World);
+	const FVector ClosestSplineTangent = Path->SplineComponent->FindTangentClosestToWorldLocation(
+		GetActorLocation(), ESplineCoordinateSpace::World);
 	//All vectors ignored Z-axis to not be affected by the height distance from player and spline (Z-axis is only for jumping)
 	FVector MovementOrientation = ClosestSplineTangent.GetSafeNormal2D();
 	//orientation is positive or negative, based on input value, and is followed for an amount based on scan distance
@@ -182,8 +203,7 @@ FVector ADynamicSidescrollerCharacter::CalculateMovementDirection(const USplineC
 
 	//Finding the new spline's point to move towards
 	const FVector ClosestNextSplinePoint = Path->SplineComponent->FindLocationClosestToWorldLocation(
-		 MovementOrientation + GetActorLocation(), ESplineCoordinateSpace::World);
+		MovementOrientation + GetActorLocation(), ESplineCoordinateSpace::World);
 	const FVector MovementDirection = ClosestNextSplinePoint - GetActorLocation();
 	return MovementDirection;
 }
-
